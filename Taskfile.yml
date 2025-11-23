@@ -1,0 +1,222 @@
+---
+version: "3"
+
+env:
+  PYTHON_VERSION: "3.12.1"
+  SRC_DIR: "src"
+  TEST_DIR: "tests"
+  LOG_DIR: "logs"
+  DEPS_FILE: "dependencies.yml"
+
+vars:
+  PROJECT_NAME: '{{.PROJECT_NAME | default "my_project"}}'
+
+tasks:
+  # ─────────────────────────────────────────────
+  # 🧭 Meta Tasks
+  # ─────────────────────────────────────────────
+  help:
+    desc: "Show all available tasks"
+    cmds:
+      - task --list
+    summary: |
+      Displays all available tasks with descriptions.
+      Serves as your development roadmap.
+
+  default:
+    desc: "Show help by default"
+    cmds:
+      - task: help
+    summary: Default entrypoint for Taskfile.
+
+  # ─────────────────────────────────────────────
+  # 🧩 Environment Validation & Setup
+  # ─────────────────────────────────────────────
+  validate-system:
+    desc: "Ensure core CLI tools exist"
+    cmds:
+      - which python3 || (echo "❌ python3 not found" && exit 1)
+      - which pip || (echo "❌ pip not found" && exit 1)
+      - which uv || echo "⚠️ UV not installed yet"
+      - which npm || echo "⚠️ npm not installed yet"
+    summary: |
+      Ensures Python, pip, uv, and npm exist before proceeding.
+
+  install-uv:
+    desc: "Install UV (idempotent)"
+    deps: [validate-system]
+    cmds:
+      - |
+        if ! command -v uv &> /dev/null; then
+          pip install --upgrade pip
+          pip install uv
+        else
+          echo "⚡ uv already installed."
+        fi
+    summary: Install or upgrade UV package manager.
+
+  uv-init:
+    desc: "Initialize UV project if not already present"
+    deps: [install-uv]
+    cmds:
+      - |
+        if [ ! -f pyproject.toml ]; then
+          uv init
+        else
+          echo "⚡ UV project already initialized."
+        fi
+    summary: Idempotent initialization of UV-managed Python project.
+
+  install-python-deps:
+    desc: "Install Python dependencies via UV"
+    deps: [uv-init]
+    cmds:
+      - uv add typer InquirerPy loguru pytest results
+      - uv add black mypy flake8 isort yamllint yamlfmt
+    summary: Install all Python packages required for the project.
+
+  install-npm-tools:
+    desc: "Install npm-based formatters"
+    deps: [validate-system]
+    cmds:
+      - |
+        if command -v npm &> /dev/null; then
+          npm install -g prettier
+        else
+          echo "⚠️ npm not found, skipping."
+        fi
+    summary: Installs global JS/YAML formatters.
+
+  sync-env:
+    desc: "Sync Python environment"
+    deps: [install-python-deps]
+    cmds:
+      - uv sync
+    summary: Ensure Python environment matches pyproject.lock.
+
+  # ─────────────────────────────────────────────
+  # 🧱 Project Structure
+  # ─────────────────────────────────────────────
+  build-dirs:
+    desc: "Create consistent project structure"
+    cmds:
+      - mkdir -p {{.SRC_DIR}}/core {{.SRC_DIR}}/lib
+      - mkdir -p {{.SRC_DIR}}/cli {{.SRC_DIR}}/utils {{.SRC_DIR}}/web
+      - mkdir -p {{.TEST_DIR}} docs scripts {{.LOG_DIR}}
+    summary: Creates source, test, and documentation directories.
+
+  add-init-files:
+    desc: "Idempotently add __init__.py to all subdirectories"
+    deps: [build-dirs, sync-env]
+    cmds:
+      - uv run init_all
+    summary: Recursively adds __init__.py files for Python package consistency.
+
+  git-setup:
+    desc: "Initialize git repository"
+    cmds:
+      - |
+        if [ ! -d .git ]; then
+          git init
+          git add .
+          git commit -m "Initial commit"
+          git branch -M main
+        else
+          echo "⚡ Git repository already exists."
+        fi
+    summary: Setup git repository for version control.
+
+  dev-setup:
+    desc: "Complete developer setup"
+    deps: [sync-env, build-dirs, add-init-files, git-setup, install-npm-tools]
+    cmds:
+      - echo "✅ Development environment ready for {{.PROJECT_NAME}}!"
+      - echo "Next steps = start coding, run 'task test', 'task lint', or 'task format'."
+    summary: |
+      One-shot setup for new environments or fresh containers.
+      Fully reproducible, idempotent, and ready for development.
+
+  # ─────────────────────────────────────────────
+  # 🔄 Dev Environment Updates
+  # ─────────────────────────────────────────────
+
+  update-system:
+    desc: "Update system packages"
+    cmds:
+      - sudo apt update -y
+      - sudo apt upgrade -y
+    summary: |
+      Updates OS-level packages safely. Ensures the base environment is current.
+
+  update-python-deps:
+    desc: "Update UV-managed Python packages"
+    deps: [uv-init]
+    cmds:
+      - uv sync
+    summary: |
+      Updates Python dependencies via UV and synchronizes the environment with pyproject.lock.
+
+  update-npm:
+    desc: "Update global npm packages"
+    cmds:
+      - if command -v npm &> /dev/null; then
+        npm update -g prettier @prettier/plugin-yaml yamlfmt;
+        else
+        echo "⚠️ npm not found, skipping";
+        fi
+    summary: Updates JS/YAML tooling safely if Node is present.
+
+  update-all:
+    desc: "Update system, Python, and npm dependencies"
+    deps: [update-system, update-python-deps, update-npm]
+    cmds:
+      - echo "✅ All updates complete!"
+    summary: |
+      One command to keep the entire dev environment current.
+      Recommended to run regularly for reproducibility and security.
+
+  # ─────────────────────────────────────────────
+  # 🧪 Testing & Linting
+  # ─────────────────────────────────────────────
+  test:
+    desc: "Run all pytest tests"
+    cmds:
+      - uv run pytest -v --disable-warnings
+    summary: Run tests with UV-managed pytest.
+
+  check-taskfile:
+    desc: "Lint the Taskfile.yml itself"
+    cmds:
+      - echo "🔹 Linting Taskfile..."
+      - uv run yamllint Taskfile.yml
+      - prettier --write Taskfile.yml
+      - uv run yamlfmt Taskfile.yml
+      - echo "✅ Taskfile linting complete."
+
+  lint:
+    desc: "Run static analysis and linting"
+    cmds:
+      - uv run black --check {{.SRC_DIR}}
+      - uv run flake8 {{.SRC_DIR}}
+      - uv run isort --check-only {{.SRC_DIR}}
+      - uv run mypy {{.SRC_DIR}}
+    summary: Ensure code style and type correctness.
+
+  format:
+    desc: "Auto-format code"
+    cmds:
+      - uv run black {{.SRC_DIR}}
+      - uv run isort {{.SRC_DIR}}
+      - echo "✅ Code formatted."
+    summary: Automatically format code for style consistency.
+
+  check:
+    desc: "Run full QA suite"
+    deps: [lint, test, check-taskfile]
+    summary: Aggregate linting and testing to validate codebase.
+
+  clean:
+    desc: "Clean temporary files"
+    cmds:
+      - rm -rf __pycache__ .pytest_cache .mypy_cache {{.LOG_DIR}}/*
+    summary: Keep project clean and predictable.

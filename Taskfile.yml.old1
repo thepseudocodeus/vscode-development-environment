@@ -1,0 +1,237 @@
+# https://taskfile.dev
+# Expert-grade Taskfile Template
+# Designed for reproducible, idempotent, and self-teaching workflows.
+
+version: '3'
+
+# Global environment and variable declarations
+env:
+  PYTHON_VERSION: "3.12.1"
+  SRC_DIR: "src"
+  TEST_DIR: "tests"
+  LOG_DIR: "logs"
+  DEPS_FILE: "dependencies.yml"
+
+vars:
+  PROJECT_NAME: "{{.PROJECT_NAME | default \"my_project\"}}"
+
+# ─────────────────────────────────────────────
+# 🧭 Meta Tasks
+# ─────────────────────────────────────────────
+tasks:
+
+  help:
+    desc: "Show all available tasks"
+    cmds:
+      - task --list
+    summary: |
+      Displays all available tasks with their descriptions.
+      Use this as your command map for daily development.
+
+  default:
+    desc: "Show the help screen when no task is specified"
+    cmds:
+      - task: help
+    summary: |
+      Default entrypoint. Run `task` alone to get help output.
+
+
+# ─────────────────────────────────────────────
+# 🧩 Environment Validation and Setup
+# ─────────────────────────────────────────────
+
+  validate-system:
+    desc: "Check for required system tools"
+    cmds:
+      - echo "🔍 Validating core tools..."
+      - which python3 || (echo "❌ Python3 not found" && exit 1)
+      - which pip || (echo "❌ pip not found" && exit 1)
+      - which uv || echo "⚠️ UV not installed yet"
+      - echo "✅ Validation complete."
+    summary: |
+      Ensures core CLI tools (python3, pip, uv) exist before setup continues.
+      This is the first line of defense against environment drift.
+
+  install-uv:
+    desc: "Install UV package manager (idempotent)"
+    deps: [validate-system]
+    cmds:
+      - |
+        if ! command -v uv &> /dev/null; then
+          echo "🔹 Installing uv..."
+          pip install --upgrade pip
+          pip install uv
+        else
+          echo "⚡ uv already installed."
+        fi
+    summary: |
+      Installs or upgrades the UV package manager.
+      UV manages Python environments and reproducible builds.
+
+  uv-init:
+    desc: "Initialize UV project if not already set up"
+    deps: [install-uv]
+    cmds:
+      - |
+        if [ ! -f "pyproject.toml" ]; then
+          echo "🔹 Initializing uv project..."
+          uv init
+        else
+          echo "⚡ UV project already initialized."
+        fi
+    summary: |
+      Initializes a new UV-managed Python project if none exists yet.
+
+
+# ─────────────────────────────────────────────
+# 🐍 Python Environment Setup
+# ─────────────────────────────────────────────
+
+  install-python-deps:
+    desc: "Install Python dependencies via UV"
+    deps: [uv-init]
+    cmds:
+      - echo "🔹 Installing dependencies..."
+      - uv add typer InquirerPy loguru pytest results black mypy flake8 isort
+    summary: |
+      Installs Python dependencies in a reproducible UV-managed environment.
+      Add or remove dependencies here as your project evolves.
+
+  sync-env:
+    desc: "Sync Python environment with pyproject.toml"
+    deps: [install-python-deps]
+    cmds:
+      - echo "🔄 Syncing environment..."
+      - sudo apt-get update -y
+      - sudo apt-get upgrade -y
+      - uv update
+      - npm update -g npm
+      - task update
+      - uv sync
+    summary: |
+      Ensures your local Python environment matches the dependency lock file.
+
+
+# ─────────────────────────────────────────────
+# 🧱 Project Structure & Build
+# ─────────────────────────────────────────────
+
+  build-dirs:
+    desc: "Create consistent project directories"
+    cmds:
+      - echo "📁 Creating directories..."
+      - mkdir -p {{.SRC_DIR}} {{.TEST_DIR}} docs scripts {{.LOG_DIR}}
+      - mkdir -p {{.SRC_DIR}}/core {{.SRC_DIR}}/lib {{.SRC_DIR}}/cli {{.SRC_DIR}}/utils {{.SRC_DIR}}/web
+      - echo "✅ Directory structure ready."
+    summary: |
+      Ensures a consistent folder structure for source, tests, and documentation.
+
+  add-init-files:
+    desc: "Add __init__.py files to source and test directories"
+    cmds:
+      - echo "📝 Adding __init__.py files..."
+      - uv run init_all.py
+      - echo "✅ __init__.py files added."
+    summary: |
+      Adds __init__.py files to all subdirectories in source and test folders.
+      Ensures Python treats these directories as packages.
+
+  git-setup:
+    desc: "Initialize a new git repository"
+    cmds:
+      - |
+        if [ ! -d ".git" ]; then
+          echo "🔹 Initializing git repository..."
+          git init
+          git add .
+          git commit -m "Initial commit"
+          git branch -M main
+          echo "✅ Git repository initialized."
+        else
+          echo "⚡ Git repository already exists."
+        fi
+    summary: |
+      Sets up a new git repository if one does not already exist.
+
+  dev-setup:
+    desc: "Full developer setup"
+    deps: [sync-env, build-dirs]
+    cmds:
+      - echo "🚀 Development environment ready for {{.PROJECT_NAME}}!"
+      - echo ""
+      - echo "📄 Summary:"
+      - echo "  - UV project initialized"
+      - echo "  - Dependencies installed"
+      - echo "  - Directories created"
+      - task: add-init-files
+      - echo "  - Init files added"
+      - task: git-setup
+      - echo "  - Git repository set up"
+      - echo "Installing yaml formatters and linters..."
+      - uv add yamllint
+      - echo ""
+      - npm install -g prettier @prettier/plugin-yaml yamlfmt
+      - echo "✅ You can now start coding!"
+      - echo "👉 Recommended next steps:"
+      - echo "connect remote git repository"
+    summary: |
+      Complete one-shot setup for new environments or fresh containers.
+      Combines validation, dependency installation, and structure setup.
+
+# ─────────────────────────────────────────────
+# 🧪 Testing & Linting
+# ─────────────────────────────────────────────
+
+  test:
+    desc: "Run all tests via UV-managed pytest"
+    cmds:
+      - echo "🔹 Running tests..."
+      - uv run pytest -v --disable-warnings
+      - echo ""
+      - echo "📊 Test Summary:"
+      - echo "  - Tests completed successfully ✅"
+      - echo "  - Timestamp $(date)"
+    summary: |
+      Runs the project’s full test suite in the UV-managed environment.
+      Includes a dynamic runtime summary for immediate feedback.
+
+  lint:
+    desc: "Run linting and static analysis tools"
+    cmds:
+      - uv run black --check {{.SRC_DIR}}
+      - uv run flake8 {{.SRC_DIR}}
+      - uv run isort --check-only {{.SRC_DIR}}
+      - uv run mypy {{.SRC_DIR}}
+      - echo "✅ Linting passed!"
+    summary: |
+      Enforces style and static correctness using black, flake8, isort, and mypy.
+
+  format:
+    desc: "Auto-format code for consistent style"
+    cmds:
+      - uv run black {{.SRC_DIR}}
+      - uv run isort {{.SRC_DIR}}
+      - echo "✅ Code formatted successfully."
+    summary: |
+      Formats code using black and isort for consistent project style.
+
+
+# ─────────────────────────────────────────────
+# 🧾 Quality & Maintenance
+# ─────────────────────────────────────────────
+
+  check:
+    desc: "Run full quality assurance suite (lint + test)"
+    deps: [lint, test]
+    summary: |
+      Aggregates quality checks for CI/CD and local confidence.
+      Runs all static analysis and tests to validate correctness.
+
+  clean:
+    desc: "Clean up temporary and cache files"
+    cmds:
+      - echo "🧹 Cleaning up temporary files..."
+      - rm -rf __pycache__ .pytest_cache .mypy_cache {{.LOG_DIR}}/*
+      - echo "✅ Cleanup complete."
+    summary: |
+      Removes temporary and cache files to keep your project clean and predictable.
