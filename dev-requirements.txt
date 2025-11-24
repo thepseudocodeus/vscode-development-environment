@@ -1,0 +1,10 @@
+ruff
+black
+mypy
+typer
+yamlfmt
+yamllint
+loguru
+inquirerpy
+pydantic
+pytest

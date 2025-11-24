@@ -50,18 +50,27 @@ tasks:
         if ! command -v uv &> /dev/null; then
           pip install --upgrade pip
           pip install uv
+          pip install --upgrade uv
         else
           echo "⚡ uv already installed."
         fi
     summary: Install or upgrade UV package manager.
 
+  update-pip:
+    desc: "Ensure pip is up to date"
+    deps: [validate-system]
+    cmds:
+      - python3 -m pip install --upgrade pip
+    summary: Keep pip current for best compatibility.
+
   uv-init:
     desc: "Initialize UV project if not already present"
-    deps: [install-uv]
+    deps: [install-uv, update-pip]
     cmds:
       - |
         if [ ! -f pyproject.toml ]; then
           uv init
+          uv venv
         else
           echo "⚡ UV project already initialized."
         fi
@@ -71,8 +80,7 @@ tasks:
     desc: "Install Python dependencies via UV"
     deps: [uv-init]
     cmds:
-      - uv add typer InquirerPy loguru pytest results
-      - uv add black mypy flake8 isort yamllint yamlfmt
+      - uv pip install -r dev-requirements.txt
     summary: Install all Python packages required for the project.
 
   install-npm-tools:
@@ -220,3 +228,12 @@ tasks:
     cmds:
       - rm -rf __pycache__ .pytest_cache .mypy_cache {{.LOG_DIR}}/*
     summary: Keep project clean and predictable.
+
+  reset-project:
+    desc: "Reset project to initial state"
+    deps: [clean]
+    cmds:
+      - rm -rf {{.SRC_DIR}} {{.TEST_DIR}} {{.LOG_DIR}} pyproject.toml pyproject.lock
+    summary: |
+      Wipe and reinitialize the project structure and environment.
+      Useful for starting fresh or recovering from issues.

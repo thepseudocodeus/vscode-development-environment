@@ -1,18 +1,17 @@
 [project]
-name = "universal-9"
+name = "vscode-development-environment"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "black>=25.11.0",
-    "flake8>=7.3.0",
     "inquirerpy>=0.3.4",
-    "isort>=7.0.0",
     "loguru>=0.7.3",
     "mypy>=1.18.2",
+    "pydantic>=2.12.4",
     "pytest>=9.0.1",
-    "results>=1.4.0",
+    "ruff>=0.14.6",
     "typer>=0.20.0",
     "yamlfmt>=1.1.1",
     "yamllint>=1.37.1",
