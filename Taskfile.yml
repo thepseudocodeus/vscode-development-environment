@@ -63,6 +63,29 @@ tasks:
       - python3 -m pip install --upgrade pip
     summary: Keep pip current for best compatibility.
 
+  init-git-lfs:
+    desc: "Initialize Git LFS if not already set up"
+    cmds:
+      - |
+        if command -v git &> /dev/null; then
+          if ! git lfs &> /dev/null; then
+            git lfs install
+          else
+            echo "⚡ Git LFS already initialized."
+          fi
+        else
+          echo "⚠️ git not found, skipping Git LFS setup."
+        fi
+      - git lfs track "*.bin" "*.exe" "*.dll" "*.zip" "*.tar.gz"
+      - git lfs track "*.png" "*.jpg" "*.jpeg" "*.gif" "*.mp4" "*.mp3"
+      - git lfs track "*.psd" "*.ai" "*.sketch" "*.pdf" "*.docx" "*.xlsx"
+      - git lfs track "*.wav" "*.flac" "*.mov" "*.avi" "*.mkv" "*.iso"
+      - git lfs track "*.csv" ".pq" "*.h5" "*.db" "*.sqlite" ".duckdb"
+      - git add .gitattributes
+      - git commit -m "tracking default file types."
+      - echo "✅ Git LFS setup complete."
+    summary: Sets up Git Large File Storage for the repository.
+
   uv-init:
     desc: "Initialize UV project if not already present"
     deps: [install-uv, update-pip]
@@ -179,6 +202,10 @@ tasks:
     deps: [update-system, update-python-deps, update-npm]
     cmds:
       - echo "✅ All updates complete!"
+      - echo "sudo pacman -Syu"
+      - echo "task update-paru"
+      - echo "udpate task"
+      - echo ""
     summary: |
       One command to keep the entire dev environment current.
       Recommended to run regularly for reproducibility and security.
@@ -237,3 +264,46 @@ tasks:
     summary: |
       Wipe and reinitialize the project structure and environment.
       Useful for starting fresh or recovering from issues.
+
+  install-paru-arch:
+    desc: "Install paru"
+    cmds:
+      - sudo pacman -Syu
+      - sudo pacman -S --needed git base-devel
+      - git clone https://aur.archlinux.org/paru.git
+      - cd paru
+      - makepkg -si
+    summary: |
+      Install paru.
+
+  search-paru-arch:
+    desc: "Search AUR with paru"
+    deps: [install-paru-arch]
+    cmds:
+      - paru -Ss {{.CLI}
+    summary: |
+      To search for packages.
+
+  install-with-paru:
+    desc: "Install packages from AUR"
+    deps: [install-paru-arch]
+    cmds:
+      - paru -S {{.CLI}
+    summary: |
+      Install package with Paru.
+
+  install-paru-interactive-arch:
+    desc: "Install paru interactively"
+    deps: [install-paru-arch]
+    cmds:
+      - paru {{.CLI}
+    summary: |
+      Install an AUR package interactively.
+
+  update-paru:
+    desc: "Update paru and all packages"
+    deps: [install-paru-arch]
+    cmds:
+      - paru
+    summary: |
+      Update paru and AUR packages.

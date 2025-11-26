@@ -8,3 +8,5 @@ loguru
 inquirerpy
 pydantic
 pytest
+python-zstandard
+rich
